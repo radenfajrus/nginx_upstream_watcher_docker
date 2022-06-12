@@ -41,3 +41,10 @@ systemctl enable nginx-docker-watcher
 systemctl start nginx-docker-watcher   
 systemctl status nginx-docker-watcher  
 
+
+<br><hr>
+When start, program will compare all file from folder conf.d.template with current running containers  
+If containers not found, delete conf file on folder conf.d  
+If containers found, replace conf file on folder conf.d with redered template (template + current ip running container)
+
+Program will listen to docker socket, if container added on deleted, re-render template config.
