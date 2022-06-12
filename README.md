@@ -22,3 +22,22 @@ https://github.com/traefik/traefik/issues/753
 
 Using template based nginx config give more freedom to add more feature, like Dynamic Canary Deployment or Dynamic Tenant Subdomain.
 
+
+
+<br><hr>
+pip3 install docker  
+python3 watcher.py  
+
+Argument:  
+- --label (default='')
+- --template-path (default='/etc/nginx/conf.d.template')
+- --destination-path (default='/etc/nginx/conf.d')
+
+
+
+cp nginx-docker-watcher.service /usr/lib/systemd/system/nginx-docker-watcher.service  
+systemctl daemon-reload  
+systemctl enable nginx-docker-watcher  
+systemctl start nginx-docker-watcher   
+systemctl status nginx-docker-watcher  
+
