@@ -20,5 +20,5 @@ https://github.com/NginxProxyManager/nginx-proxy-manager/issues/633
 3. Traefik doesnt support php cgi for some laravel and wordpress services.
 https://github.com/traefik/traefik/issues/753
 
-Using template based nginx config give more freedom to adding more feature, like Dynamic Canary Deployment or Dynamic Tenant Subdomain.
+Using template based nginx config give more freedom to add more feature, like Dynamic Canary Deployment or Dynamic Tenant Subdomain.
 
