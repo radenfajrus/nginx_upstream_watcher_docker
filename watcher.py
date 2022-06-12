@@ -6,9 +6,7 @@ import docker
 
 def parse_args(args):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--nginx-label', default='')
-    parser.add_argument('--web-label', default='')
-    #parser.add_argument('--network', default='envisions')
+    parser.add_argument('--label', default='')
     parser.add_argument('--template-path', default='/etc/nginx/conf.d.template')
     parser.add_argument('--destination-path', default='/etc/nginx/conf.d')
     parser.add_argument('--web-port', type=int, default=5090)
@@ -19,7 +17,7 @@ def parse_args(args):
 def get_currently_running_web_servers(client, args):
     filters = {'status': 'running'}
     if args.web_label:
-        filters['label'] = args.web_label
+        filters['label'] = args.label
     web_containers = client.containers.list(filters=filters)
     result = {}
     for c in web_containers:
@@ -35,7 +33,7 @@ def get_currently_running_web_servers(client, args):
 
 
 def listen_for_events(client, args, web_servers):
-    event_filters = {'type': 'container', 'label': args.web_label}
+    event_filters = {'type': 'container', 'label': args.label}
     for event in client.events(filters=event_filters, decode=True):
         print(event)
         if event['status'] == 'start':
