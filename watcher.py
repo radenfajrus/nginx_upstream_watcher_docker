@@ -165,7 +165,7 @@ def render_all_template(templates,webservers):
             if template in webservers:
                 b = b + 1
                 hostname = upstream
-                ip = webservers[template]
+                ip = webservers[hostname]
                 templates[template].render_ip(hostname,ip)
 
         if a!=b:
