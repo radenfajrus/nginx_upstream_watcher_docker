@@ -227,8 +227,8 @@ def main(args):
     containers = get_currently_running_web_servers(client, args)
 
     loader = ConfTemplateLoader(args.template_path,args.destination_path)
-    #templates = loader.get_all()
-    templates = loader.search("addon_indoormaps_nginx")
+    templates = loader.get_all()
+    #templates = loader.search("addon_indoormaps_nginx")
 
     try:
         render_all_template(templates,containers)
