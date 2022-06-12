@@ -9,14 +9,13 @@ def parse_args(args):
     parser.add_argument('--label', default='')
     parser.add_argument('--template-path', default='/etc/nginx/conf.d.template')
     parser.add_argument('--destination-path', default='/etc/nginx/conf.d')
-    parser.add_argument('--web-port', type=int, default=5090)
     return parser.parse_args(args)
 
 
 
 def get_currently_running_web_servers(client, args):
     filters = {'status': 'running'}
-    if args.web_label:
+    if args.label:
         filters['label'] = args.label
     web_containers = client.containers.list(filters=filters)
     result = {}
@@ -30,20 +29,6 @@ def get_currently_running_web_servers(client, args):
                     ip = network['IPAddress']
         result[c.name] = ip
     return result
-
-
-def listen_for_events(client, args, web_servers):
-    event_filters = {'type': 'container', 'label': args.label}
-    for event in client.events(filters=event_filters, decode=True):
-        print(event)
-        if event['status'] == 'start':
-            web_servers[event['id']] = client.containers.get(event['id'])
-        elif event['status'] == 'stop':
-            del web_servers[event['id']]
-        else:
-            continue
-        print("Detected container {} with {} status".format(event['id'], event['status']))
-        reload_nginx(client, web_servers, args)
 
 
 
@@ -198,6 +183,44 @@ def rollback_all_template(templates,webservers):
     nginx_reload()
 
 
+def listen_for_events(client, args, loader, containers):
+    event_filters = {'type': 'container'}
+    if args.label:
+        filters['label'] = args.label
+
+    for event in client.events(filters=event_filters, decode=True):
+        status   = event['status']
+        if status not in ['start','stop','die']:
+            continue
+
+        #hostname = event['id']
+        hostname = event['Actor']['Attributes']['name']
+        if status == 'start':
+            container = client.containers.get(event['id'])
+            print(container.attrs)
+            networks = container.attrs['NetworkSettings']['Networks']
+            ip = None
+            for idx in networks:
+                network = networks[idx]
+                if 'IPAddress' in network:
+                    if network['IPAddress'] != None and network['IPAddress'] != "":
+                        ip = network['IPAddress']
+            containers[hostname] = ip
+        elif status in ['stop','die']:
+            if hostname in containers:
+                del containers[hostname]
+
+        templates = loader.search(hostname)
+        try:
+            render_all_template(templates,containers)
+        except Exception as e:
+            rollback_all_template(templates,containers)
+
+        print("Detected container {} with {} status".format(hostname, status))
+
+
+
+
 def main(args):
     args = parse_args(args)
     client = docker.from_env()
@@ -212,7 +235,7 @@ def main(args):
     except Exception as e:
         rollback_all_template(templates,containers)
 
-
+    listen_for_events(client, args, loader, containers)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
