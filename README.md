@@ -47,4 +47,5 @@ When start, program will compare all file from folder conf.d.template with curre
 If containers not found, delete conf file on folder conf.d  
 If containers found, replace conf file on folder conf.d with redered template (template + current ip running container)
 
-Program will listen to docker socket, if container added on deleted, re-render template config.
+Program will listen event from docker socket (docker.sock).
+After container is added or deleted, template config will be rerendered.
