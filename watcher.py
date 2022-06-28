@@ -56,8 +56,9 @@ class ConfTemplateLoader:
         dest_filelist = []
         for root, dirs, files in os.walk(self.src_dir):
             for file in files:
-                src_filelist.append(  os.path.join(root,file)  );
-                dest_filelist.append( os.path.join(root.replace(self.src_dir,self.dest_dir),file) );
+                if not file.endswith((".swp","~","swx")):
+                    src_filelist.append(  os.path.join(root,file)  );
+                    dest_filelist.append( os.path.join(root.replace(self.src_dir,self.dest_dir),file) );
 
         self.templates = {}
         for idx,filetmpl in enumerate(src_filelist):
@@ -67,6 +68,7 @@ class ConfTemplateLoader:
 
     def get_all(self):
         """get list object ConfTemplate"""
+        self.refresh()
         return self.templates
 
     def search(self, name):
@@ -155,8 +157,8 @@ def nginx_reload():
 
 
 def render_all_template(templates,webservers):
+    print(templates)
     for template in templates:
-        #print(template)
 
         a = 0
         b = 0
@@ -187,7 +189,6 @@ def listen_for_events(client, args, loader, containers):
     event_filters = {'type': 'container'}
     if args.label:
         filters['label'] = args.label
-
     for event in client.events(filters=event_filters, decode=True):
         status   = event['status']
         if status not in ['start','stop','die']:
@@ -219,9 +220,116 @@ def listen_for_events(client, args, loader, containers):
         print("Detected container {} with {} status".format(hostname, status))
 
 
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
+class ConfDWatcher(FileSystemEventHandler):
+    def __init__(self,src_dir="",dest_dir=""):
+        """conf template loader"""
+        if src_dir=="" or dest_dir ==""or src_dir is None or dest_dir is None :
+            raise Exception("Folder not found. please set --template-path and --destination-path correctly.")
+        if not (os.path.isdir(src_dir)):
+            raise Exception("Source folder "+ src_dir +" not found. please set --template-path and --destination-path correctly.")
+        if not ( os.path.isdir(dest_dir)):
+            raise Exception("Destination Folder "+ dest_dir +" not found. please set --template-path and --destination-path correctly.")
+
+
+        self.src_dir = src_dir
+        self.dest_dir = dest_dir
+        self.files = {}
+        self.templates = {}
+        self.observer = Observer()
+        self.observer.schedule(self, self.dest_dir, recursive=True)
+        self.refresh()
+
+    def refresh(self):
+        for root, dirs, files in os.walk(self.src_dir):
+            for file in files:
+                filename = os.path.join(root.replace(self.src_dir,""),file)
+                if not file.endswith((".swp","~","swx")):
+                    self.templates[filename] = {
+                        "file": os.path.join(root,file),
+                        "dir": root,
+                    }
+
+        for root, dirs, files in os.walk(self.dest_dir):
+            for file in files:
+                filename = os.path.join(root.replace(self.dest_dir,""),file)
+                if(filename in self.templates and not filename.endswith((".swp","~","swx")) ):
+                    self.files[filename] = {
+                        "file": os.path.join(root,file),
+                        "dir": root,
+                    }
+
+    def update_template(self,file_changed):
+        print("update_template :" +file_changed)
+        return True
+
+    def is_watched(self,file_changed):
+        for filename in self.files:
+            if file_changed == self.files[filename]["file"]:
+                return True
+        return False
+
+    def on_modified(self, event):
+        if not event.is_directory and self.is_watched(event.src_path):
+            self.update_template(event.src_path)
+
+    def watch(self):
+        self.observer.start()
+        self.observer.join()
+
+class ConfDTemplateWatcher(FileSystemEventHandler):
+    def __init__(self,loader: ConfTemplateLoader, containers):
+        self.loader = loader
+        self.containers = containers
+        self.observer = Observer()
+        self.observer.schedule(self, self.loader.src_dir, recursive=True)
+
+    def on_any_event(self, event):
+        if not event.is_directory and not event.src_path.endswith((".swp","~","swx")):
+            print(event.src_path)
+            templates = self.loader.get_all()
+            try:
+                render_all_template(templates,self.containers)
+            except Exception as e:
+                rollback_all_template(templates,self.containers)
+
+    def watch(self):
+        self.observer.start()
+        self.observer.join()
+
+
+def watch_docker(client, args, loader, containers):
+    print("watch_docker")
+    #await asyncio.sleep(0.01)
+
+    #await asyncio.sleep(0.01)
+    listen_for_events(client, args, loader, containers)
+    print("watch_docker DONE")
+
+def watch_conf_d(template_path,destination_path):
+    print("watch_conf_d")
+    #await asyncio.sleep(0.01)
+
+    confd = ConfDWatcher(template_path,destination_path)
+    confd.watch()
+    print("watch_conf_d DONE")
+
+
+def watch_conf_d_template(loader,containers):
+    print("watch_conf_d_template")
+    #await asyncio.sleep(0.01)
+
+    confd = ConfDTemplateWatcher(loader,containers)
+    confd.watch()
+    print("watch_conf_d_template DONE")
+
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def main(args):
+
     args = parse_args(args)
     client = docker.from_env()
     containers = get_currently_running_web_servers(client, args)
@@ -229,13 +337,38 @@ def main(args):
     loader = ConfTemplateLoader(args.template_path,args.destination_path)
     templates = loader.get_all()
     #templates = loader.search("addon_indoormaps_nginx")
-
+    #print(containers)
     try:
         render_all_template(templates,containers)
     except Exception as e:
         rollback_all_template(templates,containers)
 
-    listen_for_events(client, args, loader, containers)
+
+    #loop = asyncio.get_event_loop()
+
+    #tasks = [
+    #    watch_conf_d_template(loader,containers)
+        #,watch_conf_d_template(loader,containers)
+    #    ,watch_docker(client, args, loader, containers)
+    #]
+
+    #commands = asyncio.gather(*tasks
+        #watch_conf_d(args.template_path,args.destination_path)
+        #watch_conf_d_template(loader,containers)
+    #)
+    #result = loop.run_until_complete(commands)
+    #result = watch_conf_d_template(sys.argv[1:])
+
+    #print(result)
+    #loop.close()
+
+    with ThreadPoolExecutor() as executor:
+        futures=[]
+        futures.append(executor.submit(watch_conf_d_template,loader,containers))
+        futures.append(executor.submit(watch_docker,client, args, loader, containers))
+        for future in as_completed(futures):
+            print(future.result())
+
 
 if __name__ == '__main__':
     main(sys.argv[1:])
