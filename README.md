@@ -26,6 +26,7 @@ Using template based nginx config give more freedom to add more feature, like Dy
 
 <br><hr>
 pip3 install docker  
+pip3 install watchdog  
 python3 watcher.py  
 
 Argument:  
@@ -48,4 +49,7 @@ If containers not found, delete conf file on folder conf.d
 If containers found, replace conf file on folder conf.d with redered template (template + current ip running container)
 
 Program will listen event from docker socket (docker.sock).
-After container is added or deleted, template config will be rerendered.
+After container is added or deleted, template will be rerendered.
+
+Program also listen file changed on conf.d.template folder.
+After file changed, template will be rerendered.
