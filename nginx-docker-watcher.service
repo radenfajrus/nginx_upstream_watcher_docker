@@ -4,7 +4,7 @@ After=network.target nginx.target docker.target
 
 [Service]
 Type=simple
-ExecStart=python3 /root/nginx_upstream_watcher_docker/watcher.py
+ExecStart=/bin/python3 /root/nginx_upstream_watcher_docker/watcher.py
 Restart=on-failure
 KillSignal=SIGINT
 WorkingDirectory=/root
